@@ -1,1 +1,2 @@
-// place files you want to import through the `$lib` alias in this folder.
+// Re-export the package component for internal app usage
+export { default as StudyTaskBurndown } from '@c00286125/study-task-burndown';

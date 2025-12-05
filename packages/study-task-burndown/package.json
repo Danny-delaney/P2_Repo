@@ -1,12 +1,13 @@
 {
   "name": "@c00286125/study-task-burndown",
-  "version": "0.0.1",
+  "version": "0.1.0",
+  "private": false,
   "type": "module",
   "svelte": "./src/StudyTaskBurndown.svelte",
   "main": "./src/index.ts",
   "exports": {
     ".": {
-      "svelte": "./src/index.ts",
+      "svelte": "./src/StudyTaskBurndown.svelte",
       "default": "./src/index.ts"
     }
   }

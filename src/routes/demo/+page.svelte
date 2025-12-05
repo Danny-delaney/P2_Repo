@@ -1,5 +1,9 @@
 <script>
-  import StudyTaskBurndown from '$lib/StudyTaskBurndown.svelte';
+  // comes from the root layout/server in the starter
+  export let data;
+  const user = data?.user ?? null;
+
+  import StudyTaskBurndown from '@c00286125/study-task-burndown';
 
   const toISO = (d) => d.toISOString().slice(0, 10);
   const addDays = (d, n) => {
@@ -39,9 +43,46 @@
       subtasks: make(10, [d0, d0]) // 2 done
     }
   ];
+
+  let saveMessage = '';
+
+  async function handleSave() {
+    saveMessage = '';
+
+    const payload = {
+      startDate,
+      dueDate,
+      tasks
+    };
+
+    try {
+      const res = await fetch('/api/burndown', {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json'
+        },
+        body: JSON.stringify(payload)
+      });
+
+      if (!res.ok) {
+        let error = 'Could not save plan (not signed in?)';
+        try {
+          const data = await res.json();
+          if (data?.error) error = data.error;
+        } catch {
+          // ignore JSON parse errors
+        }
+        saveMessage = error;
+        return;
+      }
+
+      saveMessage = 'Saved your study plan for this user.';
+    } catch (err) {
+      console.error(err);
+      saveMessage = 'Network error while saving.';
+    }
+  }
 </script>
-
-
 
 <section class="intro">
   <h1>Multi-task study burndown</h1>
