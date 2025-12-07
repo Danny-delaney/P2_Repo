@@ -1,113 +1,109 @@
-# **P2 – Study Task Burndown Component (@c00286125)**
+# P2 – Study Task Burndown Component (@c00286125)
 
-This project implements a reusable Svelte/SvelteKit component packaged for reuse, along with a demo page, authentication-dependent behaviour, and a supporting API route.
+This repository implements a reusable Svelte/SvelteKit study-task burndown component, packaged so it can be installed directly from a Git repository.
+It includes a demo page, an authentication-based save action, and a supporting API route.
 
----
+## 1. Overview
 
-## **Overview**
-
-The repository contains:
-
-### **✔ Reusable Svelte Component Package**
-Located in:
+### 1. Reusable Svelte Component Package
+Location:
 
 ```
 packages/study-task-burndown/
 ```
 
-Exports a fully reusable SVG-based burndown chart:
+Exports an SVG-based burndown chart supporting:
+- Multiple tasks
+- Remaining subtasks per day
+- Ideal burndown line
+- Toggleable visibility per task
+- Custom date ranges
 
-- Multiple tasks  
-- Remaining subtasks per day  
-- Combined ideal burndown line  
-- Toggleable per-task visibility  
-- Title, legend, and ideal-line customisation  
-
-### **✔ Demo Page**
+### 2. Demo Page
 
 ```
 src/routes/demo/+page.svelte
 ```
 
-Shows how the component works with example data.  
-Updates automatically when date ranges or subtasks change.
+Features:
+- Example dataset
+- Dynamic updates based on date range and completion
+- Authenticated and non-authenticated views
 
-### **✔ Authentication Feature**
+### 3. Authentication Feature
 
-The demo page includes a login-dependent action:
-
-- Logged-out users → asked to authenticate  
-- Logged-in users → can “save” their study plan  
-
-Uses the API route:
+The demo reacts to login state.
+When signed in, users can save their study plan through:
 
 ```
 src/routes/api/save-plan/+server.ts
 ```
 
-### **✔ API Endpoint**
+### 4. API Endpoint
 
-Handles POST submissions from the demo page.  
-Validates login status and returns a JSON response.
+Handles POST requests, checks authentication state, and returns JSON results.
 
-### **✔ Local Copy for App + Storybook**
+### 5. Local Component Copy for App and Storybook
 
-A second copy of the component exists at:
+A second development copy exists at:
 
 ```
 src/lib/StudyTaskBurndown.svelte
 ```
 
-This is used by the app and Storybook.
+### 6. Storybook
 
----
-
-## **Storybook**
-
-Storybook was installed with:
-
-```bash
-npx storybook@latest init --type sveltekit
-```
-
-A custom story is included at:
+Custom story:
 
 ```
 src/stories/StudyTaskBurndown.stories.svelte
 ```
 
-### ⚠ Windows Issue
+Note: On this Windows machine, Storybook cannot dynamically import `.stories.svelte`. This is a local environment limitation.
 
-On this machine, Storybook cannot dynamically import *any* `.stories.svelte` files (including Storybook’s own defaults).  
-This appears to be a **local Storybook/Vite/Windows environment issue**, not a problem with the component.
+## 2. Installation Guide
 
-This behaviour is documented for marking.
+### A. Install the package in another project
 
----
+```
+npm install git+https://github.com/Danny-delaney/P2_Repo.git#v0.1.0
+```
 
-## **Running the Project**
+Use in Svelte/SvelteKit:
+
+```svelte
+<script>
+  import StudyTaskBurndown from '@c00286125/study-task-burndown';
+</script>
+
+<StudyTaskBurndown
+  {startDate}
+  {dueDate}
+  {tasks}
+/>
+```
+
+### B. Running this repository
 
 Install dependencies:
 
-```bash
+```
 npm install
 ```
 
-Start the SvelteKit app:
+Start SvelteKit:
 
-```bash
+```
 npm run dev
 ```
 
-Start Storybook (may error on this machine):
+Run Storybook (may fail on this Windows setup):
 
-```bash
+```
 npm run storybook
 ```
 
----
-
-## **Component Usage Example**
+## 3. Component Usage Example
 
 ```svelte
 <script>
@@ -132,15 +128,13 @@ npm run storybook
 <StudyTaskBurndown {tasks} {startDate} {dueDate} />
 ```
 
----
+## 4. Completed Requirements
 
-## **Completed Requirements**
-
-✔ Reusable component  
-✔ Package folder structure  
-✔ Demo route  
-✔ Authentication-dependent UI  
-✔ API interaction  
-✔ Storybook configuration + custom story  
-✔ Documentation of local Storybook limitation  
-✔ Clear README for submission  
+- Reusable component package
+- Proper package structure under `packages/`
+- Demo route implementation
+- Authentication-based UI logic
+- API integration
+- Storybook story
+- Documentation of environment limitations
+- Clear installation and usage instructions
