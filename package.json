@@ -1,8 +1,18 @@
 {
-  "name": "p2",
-  "private": true,
-  "version": "0.0.1",
+  "name": "@c00286125/study-task-burndown",
+  "version": "0.1.0",
+  "private": false,
   "type": "module",
+
+  "svelte": "./packages/study-task-burndown/src/StudyTaskBurndown.svelte",
+  "main": "./packages/study-task-burndown/src/index.ts",
+  "exports": {
+    ".": {
+      "svelte": "./packages/study-task-burndown/src/StudyTaskBurndown.svelte",
+      "default": "./packages/study-task-burndown/src/index.ts"
+    }
+  },
+
   "scripts": {
     "dev": "vite dev",
     "build": "vite build",
@@ -13,6 +23,7 @@
     "storybook": "storybook dev -p 6006",
     "build-storybook": "storybook build"
   },
+
   "devDependencies": {
     "@sveltejs/adapter-auto": "^7.0.0",
     "@sveltejs/kit": "^2.48.5",
