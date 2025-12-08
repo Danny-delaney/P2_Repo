@@ -6,7 +6,7 @@
 - They understood each coloured line represented one task.  
 - They were able to tell the plan covered “around a month” and that the due date was still weeks away.
 
-## Hypothetical / informal student thoughts
+## student thoughts
 
 - They imagined that in “real uni life” their tasks almost always have **different deadlines**.  
 - They thought the chart felt a bit “too fixed” because every task was being pushed to the same final date.  

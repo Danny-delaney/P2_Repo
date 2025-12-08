@@ -1,8 +1,7 @@
 <script>
   // PUBLIC PROPS
   export let startDate; // 'YYYY-MM-DD'
-  // v0.3.0: tasks carry their own dueDate
-  // task shape: { title, subtasksNum, subtasks: [{ completedDate }], dueDate }
+  // tasks: { title, subtasksNum, subtasks: [{ completedDate }], dueDate }
   export let tasks = [];
 
   export let title = 'Multi-task study burndown';
@@ -85,7 +84,7 @@
     );
   }
 
-  // v0.3.0: derive chart end date from the latest task dueDate
+  // derive chart end date from the latest task dueDate
   function getChartEndFromTasks(startISO, taskList) {
     if (!taskList || !taskList.length) return startISO;
     let latest = parseISO(startISO);
@@ -99,7 +98,7 @@
     return toISO(latest);
   }
 
-  // v0.3.0: build a linear "ideal" series for a single task, going to 0 on its own dueDate
+  // build a linear "ideal" series for a single task, going to 0 on its own dueDate
   function buildIdealForTask(task, range, total) {
     if (!range.length) return [];
 
@@ -135,6 +134,12 @@
   // Chart range from startDate + latest task.dueDate
   $: chartEndDate = getChartEndFromTasks(startDate, tasks);
   $: dateRange = getDateRange(startDate, chartEndDate);
+
+  // v0.3.1 demo tweak:
+  // "today" is artificially set to the middle of the dateRange.
+  $: todayIndex = dateRange.length
+    ? Math.floor(dateRange.length / 2)
+    : -1;
 
   // For each task: remainingPerDay + idealPerDay
   $: taskSeries = (tasks || []).map((task) => {
@@ -189,14 +194,32 @@
     return marginLeft + (chartWidth * index) / (total - 1);
   }
 
-  function seriesToPolylinePoints(values) {
-    return values
-      .map((v, i) => `${indexToX(i, values.length)},${valueToY(v)}`)
-      .join(' ');
+  // Allow cutting off at an index (used for actual series)
+  function seriesToPolylinePoints(values, cutIndex) {
+    if (!values || !values.length) return '';
+    let lastIndex = values.length - 1;
+
+    if (
+      typeof cutIndex === 'number' &&
+      cutIndex >= 0 &&
+      cutIndex < values.length
+    ) {
+      lastIndex = cutIndex;
+    }
+
+    const pts = [];
+    for (let i = 0; i <= lastIndex; i++) {
+      const v = values[i];
+      pts.push(`${indexToX(i, values.length)},${valueToY(v)}`);
+    }
+    return pts.join(' ');
   }
 
   // Axis tick density
   $: xTickEvery = dateRange.length > 10 ? 2 : 1;
+
+  // STRICT cut: if we have a valid todayIndex, cut there.
+  $: actualCutIndex = todayIndex >= 0 ? todayIndex : undefined;
 </script>
 
 <section class="burndown-wrapper">
@@ -204,7 +227,8 @@
     <header class="header">
       <h2>{title}</h2>
       <p class="subtitle">
-        Remaining subtasks over time for each study task (each task has its own deadline).
+        Remaining subtasks over time for each study task
+        (ideal lines to each deadline, actual lines cut at the mid-point “today”).
       </p>
     </header>
   {/if}
@@ -220,7 +244,7 @@
       <line x1="6" y1="80" x2="95" y2="80" class="axis" />
       <line x1="6" y1="5" x2="6" y2="80" class="axis" />
 
-      <!-- Per-task ideal lines (dashed) -->
+      <!-- Per-task ideal lines (dashed, full timeline) -->
       {#if showIdealLine}
         {#each taskSeries as series, i}
           {#if visibleFlags[i]}
@@ -233,14 +257,23 @@
         {/each}
       {/if}
 
-      <!-- Actual remaining lines -->
+      <!-- Actual remaining lines (cut at artificial mid-point "today") -->
       {#each taskSeries as series, i}
         {#if visibleFlags[i]}
           <polyline
             class="task-line"
             style={`stroke: ${colours[i % colours.length]};`}
-            points={seriesToPolylinePoints(series.remainingPerDay)}
+            points={seriesToPolylinePoints(series.remainingPerDay, actualCutIndex)}
           />
+          {#if todayIndex >= 0 && todayIndex < series.remainingPerDay.length}
+            <!-- dot marker at "today" -->
+            <circle
+              cx={indexToX(todayIndex, series.remainingPerDay.length)}
+              cy={valueToY(series.remainingPerDay[todayIndex])}
+              r="0.9"
+              style={`fill: ${colours[i % colours.length]};`}
+            />
+          {/if}
         {/if}
       {/each}
 
@@ -290,7 +323,9 @@
         {#if showIdealLine}
           <div class="legend-extra">
             <span class="ideal-swatch" />
-            <span class="label">Dashed line = ideal pace per task</span>
+            <span class="label">
+              Dashed line = ideal pace per task • Solid line = actual progress up to mid-plan “today”
+            </span>
           </div>
         {/if}
       </div>
@@ -298,7 +333,7 @@
   </div>
 
   <footer class="footer">
-    <p>Study burndown component v0.3.0 by @c00286125</p>
+    <p>Study burndown component v0.3.1 (demo mid-point today) by @c00286125</p>
   </footer>
 </section>
 
