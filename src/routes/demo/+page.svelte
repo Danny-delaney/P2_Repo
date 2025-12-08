@@ -14,7 +14,7 @@
 
   const today = new Date();
   let startDate = toISO(today);
-  let dueDate = toISO(addDays(today, 6)); // 1-week window
+  let dueDate = toISO(addDays(today, 6)); // 1-week window (still used as a default)
 
   const make = (n, dates) =>
     Array.from({ length: n }, (_, i) => ({
@@ -25,22 +25,29 @@
   const d1 = toISO(addDays(today, 1));
   const d2 = toISO(addDays(today, 2));
   const d3 = toISO(addDays(today, 3));
+  const d4 = toISO(addDays(today, 4));
 
   let tasks = [
     {
       title: 'Essay draft',
       subtasksNum: 8,
-      subtasks: make(8, [d0, d0, d1]) // 3 done
+      subtasks: make(8, [d0, d0, d1]), // 3 done
+      // v0.3.0: task-specific due date
+      dueDate: d2
     },
     {
       title: 'Stats problem set',
       subtasksNum: 6,
-      subtasks: make(6, [d1, d2, d3, d3]) // 4 done
+      subtasks: make(6, [d1, d2, d3, d3]), // 4 done
+      // shares the global 1-week due date
+      dueDate: dueDate
     },
     {
       title: 'Reading + notes',
       subtasksNum: 10,
-      subtasks: make(10, [d0, d0]) // 2 done
+      subtasks: make(10, [d0, d0]), // 2 done
+      // somewhere in the middle of the range
+      dueDate: d4
     }
   ];
 
@@ -87,7 +94,7 @@
 <section class="intro">
   <h1>Multi-task study burndown</h1>
   <p>
-    This test view shows three example study tasks over the same date range.
+    This test view shows three example study tasks, each with its own due date.
     Click task names in the legend to toggle each line on and off.
   </p>
 
@@ -101,9 +108,18 @@
       <input type="date" bind:value={dueDate} />
     </label>
   </div>
+
+  {#if user}
+    <button on:click|preventDefault={handleSave}>Save this plan for my account</button>
+    {#if saveMessage}
+      <p class="message">{saveMessage}</p>
+    {/if}
+  {:else}
+    <p class="message">Sign in to save this plan to your account.</p>
+  {/if}
 </section>
 
-<StudyTaskBurndown {startDate} {dueDate} {tasks} />
+<StudyTaskBurndown {startDate} {tasks} />
 
 <style>
   section.intro {
@@ -119,9 +135,10 @@
     font-size: 1.4rem;
   }
 
-  p {
-    margin: 0 0 0.8rem;
-    font-size: 0.95rem;
+  .message {
+    margin-top: 0.5rem;
+    font-size: 0.85rem;
+    color: #4b5563;
   }
 
   .dates-row {

@@ -1,26 +1,15 @@
-<script lang="ts">
-  // Core types your package exports / uses
-  export type Subtask = {
-    completedDate: string | null; // 'YYYY-MM-DD' or null
-  };
+<script>
+  // PUBLIC PROPS
+  export let startDate; // 'YYYY-MM-DD'
+  // v0.3.0: tasks carry their own dueDate
+  // task shape: { title, subtasksNum, subtasks: [{ completedDate }], dueDate }
+  export let tasks = [];
 
-  export type Task = {
-    title: string;
-    subtasksNum: number;
-    subtasks: Subtask[];
-  };
+  export let title = 'Multi-task study burndown';
+  export let showLegend = true;
+  export let showIdealLine = true;
 
-  // Required props
-  export let startDate: string; // 'YYYY-MM-DD'
-  export let dueDate: string;   // 'YYYY-MM-DD'
-  export let tasks: Task[] = [];
-
-  // Optional customisation props
-  export let title: string = 'Multi-task study burndown';
-  export let showLegend: boolean = true;
-  export let showIdealLine: boolean = true;
-
-  // Simple colour palette for up to a few tasks
+  // Simple colour palette
   const colours = [
     '#2563eb', // blue
     '#16a34a', // green
@@ -30,141 +19,183 @@
     '#facc15'  // yellow
   ];
 
-  const parseISO = (value: string): Date => {
-    const [y, m, d] = value.split('-').map(Number);
-    return new Date(y, (m || 1) - 1, d || 1);
-  };
+  function parseISO(value) {
+    const parts = value.split('-').map(Number);
+    const y = parts[0];
+    const m = (parts[1] || 1) - 1;
+    const d = parts[2] || 1;
+    return new Date(y, m, d);
+  }
 
-  const toISO = (d: Date): string => d.toISOString().slice(0, 10);
+  function toISO(d) {
+    return d.toISOString().slice(0, 10);
+  }
 
-  const shortLabel = (d: Date): string =>
-    d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+  function shortLabel(d) {
+    return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+  }
 
-  const clampDateRange = (start: string, end: string): [string, string] => {
+  function clampDateRange(start, end) {
     const s = parseISO(start);
     const e = parseISO(end);
     if (e < s) return [toISO(e), toISO(s)];
     return [start, end];
-  };
+  }
 
-  const getDateRange = (start: string, end: string): Date[] => {
-    const [sISO, eISO] = clampDateRange(start, end);
-    const startDate = parseISO(sISO);
-    const endDate = parseISO(eISO);
+  function getDateRange(start, end) {
+    const pair = clampDateRange(start, end);
+    const sISO = pair[0];
+    const eISO = pair[1];
 
-    const range: Date[] = [];
-    const cursor = new Date(startDate);
+    const startDateObj = parseISO(sISO);
+    const endDateObj = parseISO(eISO);
 
-    while (cursor <= endDate) {
+    const range = [];
+    const cursor = new Date(startDateObj);
+
+    while (cursor <= endDateObj) {
       range.push(new Date(cursor));
       cursor.setDate(cursor.getDate() + 1);
     }
 
     return range;
-  };
+  }
 
-  const getTotalSubtasks = (task: Task): number => {
-    // Prefer explicit subtasksNum, but fall back to actual subtasks length
-    return typeof task.subtasksNum === 'number' && task.subtasksNum > 0
-      ? task.subtasksNum
-      : task.subtasks.length;
-  };
+  function getTotalSubtasks(task) {
+    if (typeof task.subtasksNum === 'number' && task.subtasksNum > 0) {
+      return task.subtasksNum;
+    }
+    return Array.isArray(task.subtasks) ? task.subtasks.length : 0;
+  }
 
-  const countCompletedUpTo = (task: Task, day: Date): number => {
+  function countCompletedUpTo(task, day) {
+    if (!Array.isArray(task.subtasks)) return 0;
     const dayISO = toISO(day);
     return task.subtasks.filter((s) => {
-      if (!s.completedDate) return false;
+      if (!s || !s.completedDate) return false;
       return s.completedDate <= dayISO;
     }).length;
-  };
+  }
 
-  // Derived data --------------------------------------------------------
+  function isSameDay(a, b) {
+    return (
+      a.getFullYear() === b.getFullYear() &&
+      a.getMonth() === b.getMonth() &&
+      a.getDate() === b.getDate()
+    );
+  }
 
-  $: dateRange = getDateRange(startDate, dueDate);
+  // v0.3.0: derive chart end date from the latest task dueDate
+  function getChartEndFromTasks(startISO, taskList) {
+    if (!taskList || !taskList.length) return startISO;
+    let latest = parseISO(startISO);
 
-  type TaskSeries = {
-    task: Task;
-    total: number;
-    remainingPerDay: number[]; // same length as dateRange
-  };
+    taskList.forEach((task) => {
+      if (!task || !task.dueDate) return;
+      const d = parseISO(task.dueDate);
+      if (d > latest) latest = d;
+    });
 
-  $: taskSeries = tasks.map<TaskSeries>((task) => {
+    return toISO(latest);
+  }
+
+  // v0.3.0: build a linear "ideal" series for a single task, going to 0 on its own dueDate
+  function buildIdealForTask(task, range, total) {
+    if (!range.length) return [];
+
+    const due = parseISO(task.dueDate);
+    const endIndex = range.findIndex((d) => isSameDay(d, due));
+
+    // if due date isn't in range, keep flat
+    if (endIndex === -1) {
+      return new Array(range.length).fill(total);
+    }
+
+    const series = new Array(range.length).fill(total);
+
+    if (endIndex <= 0) {
+      series.fill(0);
+      return series;
+    }
+
+    for (let i = 0; i <= endIndex; i++) {
+      const t = i / endIndex; // 0 → 1
+      series[i] = Math.max(0, total * (1 - t));
+    }
+
+    for (let i = endIndex + 1; i < range.length; i++) {
+      series[i] = 0;
+    }
+
+    return series;
+  }
+
+  // -------- DERIVED STATE (Svelte reactivity) -----------------
+
+  // Chart range from startDate + latest task.dueDate
+  $: chartEndDate = getChartEndFromTasks(startDate, tasks);
+  $: dateRange = getDateRange(startDate, chartEndDate);
+
+  // For each task: remainingPerDay + idealPerDay
+  $: taskSeries = (tasks || []).map((task) => {
     const total = getTotalSubtasks(task);
     const remainingPerDay = dateRange.map((day) => {
       const done = countCompletedUpTo(task, day);
       return Math.max(total - done, 0);
     });
+    const idealPerDay = buildIdealForTask(task, dateRange, total);
 
-    return { task, total, remainingPerDay };
+    return { task, total, remainingPerDay, idealPerDay };
   });
 
-  $: maxRemaining = (() => {
-    const allValues = taskSeries.flatMap((s) => s.remainingPerDay);
-    const max = Math.max(0, ...allValues);
-    return max || 1; // avoid divide-by-zero
-  })();
-
-  // Ideal (target) line that uses the same Y scale as the other series.
-  // It goes from the current maxRemaining down to 0 so it stays inside the chart.
-  let idealSeries: number[] | null;
-
-  $: idealSeries = (() => {
-    if (!showIdealLine || !taskSeries.length) return null;
-
-    const start = maxRemaining;
-    const n = dateRange.length;
-    if (n <= 1) {
-      return [start];
-    }
-
-    return dateRange.map((_, i) => {
-      const t = i / (n - 1); // 0 -> 1
-      const remaining = start * (1 - t);
-      return remaining;
+  $: maxRemaining = (function () {
+    const values = [];
+    (taskSeries || []).forEach((s) => {
+      values.push.apply(values, s.remainingPerDay);
     });
+    const max = values.length ? Math.max.apply(null, values) : 0;
+    return max || 1; // avoid divide by zero
   })();
 
+  // Legend visibility
+  let visibleFlags = (tasks || []).map(() => true);
 
-  // Legend visibility state
-  let visibleFlags: boolean[] = tasks.map(() => true);
-
-  $: if (visibleFlags.length !== tasks.length) {
-    visibleFlags = tasks.map(() => true);
+  $: if (!visibleFlags || visibleFlags.length !== (tasks || []).length) {
+    visibleFlags = (tasks || []).map(() => true);
   }
 
-  const toggleTask = (index: number) => {
+  function toggleTask(index) {
     visibleFlags = visibleFlags.map((flag, i) =>
       i === index ? !flag : flag
     );
-  };
+  }
 
-  // SVG helpers ---------------------------------------------------------
-
-  const valueToY = (value: number): number => {
-    // Map 0..maxRemaining to SVG 80..5 (top)
-    const marginTop = 5;
+  // Helpers to map values to SVG coords
+  function valueToY(value) {
+    const marginTop = 10;
     const marginBottom = 20;
     const chartHeight = 100 - marginTop - marginBottom;
 
     const ratio = maxRemaining ? value / maxRemaining : 0;
     return marginTop + chartHeight * (1 - ratio);
-  };
+  }
 
-  const indexToX = (index: number, total: number): number => {
+  function indexToX(index, total) {
     if (total <= 1) return 50;
     const marginLeft = 6;
     const marginRight = 5;
     const chartWidth = 100 - marginLeft - marginRight;
 
     return marginLeft + (chartWidth * index) / (total - 1);
-  };
+  }
 
-  const seriesToPolylinePoints = (values: number[]): string =>
-    values
+  function seriesToPolylinePoints(values) {
+    return values
       .map((v, i) => `${indexToX(i, values.length)},${valueToY(v)}`)
       .join(' ');
+  }
 
-  // Axis tick labels every N days
+  // Axis tick density
   $: xTickEvery = dateRange.length > 10 ? 2 : 1;
 </script>
 
@@ -173,7 +204,7 @@
     <header class="header">
       <h2>{title}</h2>
       <p class="subtitle">
-        Remaining subtasks over time for each study task.
+        Remaining subtasks over time for each study task (each task has its own deadline).
       </p>
     </header>
   {/if}
@@ -189,15 +220,20 @@
       <line x1="6" y1="80" x2="95" y2="80" class="axis" />
       <line x1="6" y1="5" x2="6" y2="80" class="axis" />
 
-      <!-- Ideal line -->
-      {#if idealSeries}
-        <polyline
-          class="ideal-line"
-          points={seriesToPolylinePoints(idealSeries)}
-        />
+      <!-- Per-task ideal lines (dashed) -->
+      {#if showIdealLine}
+        {#each taskSeries as series, i}
+          {#if visibleFlags[i]}
+            <polyline
+              class="ideal-line"
+              style={`stroke: ${colours[i % colours.length]};`}
+              points={seriesToPolylinePoints(series.idealPerDay)}
+            />
+          {/if}
+        {/each}
       {/if}
 
-      <!-- Task lines -->
+      <!-- Actual remaining lines -->
       {#each taskSeries as series, i}
         {#if visibleFlags[i]}
           <polyline
@@ -208,7 +244,7 @@
         {/if}
       {/each}
 
-      <!-- X-axis labels (dates) -->
+      <!-- X-axis date labels -->
       {#each dateRange as day, i}
         {#if i % xTickEvery === 0}
           <text
@@ -245,16 +281,16 @@
             <span class="label">
               {series.task.title}
               <span class="meta">
-                ({series.total} subtasks)
+                ({series.total} subtasks, due {series.task.dueDate})
               </span>
             </span>
           </button>
         {/each}
 
-        {#if idealSeries}
+        {#if showIdealLine}
           <div class="legend-extra">
             <span class="ideal-swatch" />
-            <span class="label">Ideal combined burndown</span>
+            <span class="label">Dashed line = ideal pace per task</span>
           </div>
         {/if}
       </div>
@@ -262,7 +298,7 @@
   </div>
 
   <footer class="footer">
-    <p>Study burndown component by @c00286125</p>
+    <p>Study burndown component v0.3.0 by @c00286125</p>
   </footer>
 </section>
 
@@ -278,9 +314,9 @@
     font-size: 1.15rem;
   }
 
-  .subtitle {
-    margin: 0.25rem 0 0;
-    font-size: 0.85rem;
+  .header .subtitle {
+    margin: 0.15rem 0 0;
+    font-size: 0.9rem;
     color: #4b5563;
   }
 
@@ -294,85 +330,73 @@
   svg {
     display: block;
     width: 100%;
-    height: auto;        /* let the viewBox control the aspect ratio */
-    max-height: 260px;   /* optional cap for tall screens */
+    height: auto;
+    max-height: 260px;
   }
 
   .axis {
-    stroke: #d1d5db;
-    stroke-width: 0.5;
-  }
-
-  .ideal-line {
-    fill: none;
     stroke: #9ca3af;
-    stroke-width: 0.8;
-    stroke-dasharray: 3 2;
+    stroke-width: 0.6;
   }
 
   .task-line {
     fill: none;
     stroke-width: 1.4;
-    stroke-linejoin: round;
-    stroke-linecap: round;
   }
 
-  .x-label {
-    font-size: 2.5px;
-    text-anchor: middle;
-    dominant-baseline: hanging;
-    fill: #6b7280;
+  .ideal-line {
+    fill: none;
+    stroke-width: 1;
+    stroke-dasharray: 4 2;
   }
 
+  .x-label,
   .y-label {
-    font-size: 2.5px;
-    text-anchor: start;
-    dominant-baseline: middle;
-    fill: #6b7280;
+    font-size: 3px;
+    fill: #4b5563;
   }
 
   .legend {
+    margin-top: 0.75rem;
     display: flex;
     flex-wrap: wrap;
-    gap: 0.35rem;
-    margin-top: 0.75rem;
+    gap: 0.5rem;
+    align-items: center;
   }
 
   .legend button {
-    display: inline-flex;
+    display: flex;
     align-items: center;
-    gap: 0.35rem;
-    padding: 0.25rem 0.5rem;
+    gap: 0.4rem;
+    border: none;
+    background: transparent;
+    padding: 0.15rem 0.4rem;
     border-radius: 999px;
-    border: 1px solid #e5e7eb;
-    background: #f9fafb;
-    font-size: 0.8rem;
     cursor: pointer;
+    font-size: 0.8rem;
+    color: #374151;
+    opacity: 0.6;
+    transition: opacity 0.15s ease, background-color 0.15s ease;
   }
 
   .legend button.selected {
-    background: #eef2ff;
-    border-color: #a5b4fc;
+    opacity: 1;
+    background-color: #f3f4f6;
   }
 
-  .legend button:hover {
-    background: #f3f4f6;
-  }
-
-  .swatch {
-    width: 10px;
-    height: 10px;
+  .legend .swatch {
+    width: 0.75rem;
+    height: 0.75rem;
     border-radius: 999px;
-    flex-shrink: 0;
   }
 
-  .label {
+  .legend .label {
     display: inline-flex;
     align-items: baseline;
     gap: 0.25rem;
   }
 
-  .meta {
+  .legend .meta {
     font-size: 0.7rem;
     color: #6b7280;
   }
@@ -380,43 +404,22 @@
   .legend-extra {
     display: inline-flex;
     align-items: center;
-    gap: 0.35rem;
-    padding: 0.25rem 0.5rem;
-    border-radius: 999px;
+    gap: 0.3rem;
+    margin-left: auto;
     font-size: 0.8rem;
     color: #4b5563;
   }
 
-  .ideal-swatch {
-    width: 18px;
-    height: 2px;
-    border-radius: 999px;
-    background-image: linear-gradient(
-      to right,
-      #9ca3af 25%,
-      transparent 25%,
-      transparent 50%,
-      #9ca3af 50%,
-      #9ca3af 75%,
-      transparent 75%,
-      transparent
-    );
-    background-size: 6px 2px;
+  .legend-extra .ideal-swatch {
+    width: 1.2rem;
+    height: 0;
+    border-top: 1px dashed #6b7280;
   }
 
   .footer {
+    margin-top: 0.5rem;
     font-size: 0.75rem;
-    color: #9ca3af;
-  }
-
-  @media (max-width: 640px) {
-    svg {
-      max-height: 220px;
-    }
-
-    .legend {
-      flex-direction: column;
-      align-items: flex-start;
-    }
+    color: #6b7280;
+    text-align: right;
   }
 </style>
